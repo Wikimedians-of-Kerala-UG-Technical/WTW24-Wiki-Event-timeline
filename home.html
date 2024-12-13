@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Home Page</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Welcome to Movie World</h1>
+        <p>Your one-stop destination for movies and events</p>
+    </header>
+
+    <main class="main-content">
+        <!-- Event Timeline -->
+        <section class="timeline">
+            <h2>Upcoming Movie Events</h2>
+            <div class="timeline-item">
+                <div class="timeline-date">Jan 15</div>
+                <div class="timeline-details">Premiere of "Adventure Quest"</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-date">Feb 20</div>
+                <div class="timeline-details">Fan Meet: "The Heroic Saga"</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-date">Mar 10</div>
+                <div class="timeline-details">"Epic Lands" Screening</div>
+            </div>
+        </section>
+
+        <!-- Movie Cards -->
+        <section class="movie-cards">
+            <h2>Now Showing</h2>
+            <div class="card">
+                <img src="movie1.jpg" alt="Movie 1" class="card-img">
+                <h3 class="card-title">Movie 1</h3>
+                <button class="play-button" onclick="playMovie('Movie 1')">▶ Play</button>
+            </div>
+            <div class="card">
+                <img src="movie2.jpg" alt="Movie 2" class="card-img">
+                <h3 class="card-title">Movie 2</h3>
+                <button class="play-button" onclick="playMovie('Movie 2')">▶ Play</button>
+            </div>
+            <div class="card">
+                <img src="movie3.jpg" alt="Movie 3" class="card-img">
+                <h3 class="card-title">Movie 3</h3>
+                <button class="play-button" onclick="playMovie('Movie 3')">▶ Play</button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Movie World. All Rights Reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
