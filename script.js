@@ -54,10 +54,10 @@ fetch(endpointUrl, {
           : "No Link";
 
         return `
-          <div class="bg-white rounded-lg shadow-lg p-4 m-4 max-w-sm">
-            <h3 class="text-lg font-bold mb-2">${movie.title}</h3>
-            <p class="text-amber-500"><strong>Release Date:</strong> ${releaseDate}</p>
-            <p class="mt-2"><strong>More Info:</strong> ${wikipediaLink}</p>
+          <div class="movie-card" data-year=${releaseDate}>
+            <h3 >${movie.title}</h3>
+            <p><strong>Release Date:</strong> ${releaseDate}</p>
+            <p><strong>More Info:</strong> ${wikipediaLink}</p>
           </div>
         `;
       });
