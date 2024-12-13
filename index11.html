@@ -3,15 +3,310 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timeline</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Interactive Movies Timeline</title>
+    <style>
+        /* General body styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #121212;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Center the content */
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Title Styles */
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 40px;
+            color: #ff4081;
+            font-family: 'Lobster', sans-serif;
+        }
+
+        /* Search bar and filters styles */
+        .filters {
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .filters input, .filters select {
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ff4081;
+            border-radius: 5px;
+            outline: none;
+            background-color: #333;
+            color: #fff;
+        }
+
+        .filters input[type="text"] {
+            width: 250px;
+        }
+
+        /* Timeline styles */
+        .timeline {
+            position: relative;
+            height: 600px;
+            margin-top: 50px;
+            padding-left: 50px;
+            background-color: #1e1e1e;
+            overflow: hidden;
+            border-left: 5px solid #ff4081;
+            border-top: 5px solid #ff4081;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: height 0.3s ease;
+        }
+
+        /* Card styles for movies */
+        .movie {
+            position: absolute;
+            width: 240px;
+            padding: 20px;
+            background-color: #333;
+            border: 2px solid #ff4081;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transform: translateX(-100%);
+            opacity: 0;
+            transition: transform 2s ease-in-out, opacity 2s ease-in-out;
+        }
+
+        /* Movie title and description */
+        .movie .movie-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ff4081;
+            margin-bottom: 10px;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .movie .movie-date {
+            font-size: 14px;
+            color: #ddd;
+            margin-top: 10px;
+        }
+
+        .movie .movie-description {
+            font-size: 13px;
+            color: #bbb;
+            margin-top: 10px;
+            height: 80px;
+            overflow: hidden;
+        }
+
+        .movie .movie-image {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .movie .movie-wikipedia {
+            display: block;
+            margin-top: 10px;
+            color: #ff4081;
+            text-decoration: none;
+        }
+
+        .movie .movie-wikipedia:hover {
+            text-decoration: underline;
+        }
+
+        /* Play Button styles */
+        .play-button {
+            padding: 14px 35px;
+            font-size: 18px;
+            background-color: #ff4081;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 40px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .play-button:hover {
+            background-color: #ff80ab;
+            transform: scale(1.05);
+        }
+
+        .play-button:active {
+            background-color: #ff4081;
+        }
+
+        /* Font family - Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Lobster&family=Roboto:wght@300;400;500&display=swap');
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Historical Events Timeline</h1>
-        <div id="timeline"></div>
+        <h1>Interactive Movies Timeline</h1>
+
+        <!-- Search and Filters -->
+        <div class="filters">
+            <input type="text" id="searchBar" placeholder="Search by Movie Title">
+            <select id="yearFilter">
+                <option value="">Select Year Range</option>
+                <option value="1990-2000">1990 - 2000</option>
+                <option value="2001-2010">2001 - 2010</option>
+                <option value="2011-2020">2011 - 2020</option>
+                <option value="2021-2024">2021 - 2024</option>
+            </select>
+        </div>
+
+        <div id="timeline" class="timeline">
+            <!-- Timeline events will be inserted here -->
+        </div>
+
+        <button id="playButton" class="play-button">Play Timeline</button>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const sparqlEndpoint = "https://query.wikidata.org/sparql";
+            const searchBar = document.getElementById('searchBar');
+            const yearFilter = document.getElementById('yearFilter');
+
+            function buildQuery(yearRange) {
+                let yearFilterQuery = '';
+                if (yearRange) {
+                    const [startYear, endYear] = yearRange.split('-').map(Number);
+                    yearFilterQuery = `FILTER(YEAR(?release_date) >= ${startYear} && YEAR(?release_date) <= ${endYear})`;
+                }
+
+                return `
+                    SELECT ?movie ?movieLabel ?release_date ?movieDescription ?movieImage ?movieUrl WHERE {
+                        ?movie wdt:P31 wd:Q11424;  # Instance of movie
+                              wdt:P577 ?release_date;  # Release date
+                              wdt:P1476 ?movieDescription;  # Description
+                              wdt:P18 ?movieImage;  # Image
+                              wdt:P856 ?movieUrl.  # Wikipedia link
+                        SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+                        ${yearFilterQuery}
+                    }
+                    ORDER BY ?release_date
+                    LIMIT 10
+                `;
+            }
+
+            function fetchMovies(query) {
+                return fetch(sparqlEndpoint + "?query=" + encodeURIComponent(query) + "&format=json", {
+                    method: "GET",
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+                        "Accept": "application/json"
+                    }
+                })
+                .then(response => response.json())
+                .then(data => data.results.bindings)
+                .catch(error => {
+                    console.error("Error fetching data:", error);
+                    return [];
+                });
+            }
+
+            function displayMovies(movies) {
+                const timeline = document.getElementById("timeline");
+                timeline.innerHTML = ''; // Clear previous timeline
+
+                const movieElements = [];
+                movies.forEach((movie, index) => {
+                    const movieDiv = document.createElement("div");
+                    movieDiv.classList.add("movie");
+
+                    const releaseDate = new Date(movie.release_date.value);
+                    const position = (releaseDate.getFullYear() - 1990) * 50;
+                    movieDiv.style.left = `${position}px`;
+
+                    const title = document.createElement("div");
+                    title.classList.add("movie-title");
+                    title.innerText = movie.movieLabel.value;
+
+                    const date = document.createElement("div");
+                    date.classList.add("movie-date");
+                    date.innerText = releaseDate.toLocaleDateString();
+
+                    const description = document.createElement("div");
+                    description.classList.add("movie-description");
+                    description.innerText = movie.movieDescription.value || "No description available.";
+
+                    const image = document.createElement("img");
+                    image.classList.add("movie-image");
+                    image.src = movie.movieImage.value || "https://via.placeholder.com/240x140.png?text=No+Image";
+
+                    const wikipediaLink = document.createElement("a");
+                    wikipediaLink.classList.add("movie-wikipedia");
+                    wikipediaLink.href = movie.movieUrl.value;
+                    wikipediaLink.target = "_blank";
+                    wikipediaLink.innerText = "Read more on Wikipedia";
+
+                    movieDiv.appendChild(title);
+                    movieDiv.appendChild(date);
+                    movieDiv.appendChild(description);
+                    movieDiv.appendChild(image);
+                    movieDiv.appendChild(wikipediaLink);
+                    timeline.appendChild(movieDiv);
+
+                    movieElements.push(movieDiv);
+                });
+
+                return movieElements;
+            }
+
+            // Initial fetch and display
+            fetchMovies(buildQuery('1990-2020')).then(displayMovies);
+
+            searchBar.addEventListener('input', function () {
+                const searchText = searchBar.value.toLowerCase();
+                fetchMovies(buildQuery(yearFilter.value)).then(movies => {
+                    const filteredMovies = movies.filter(movie =>
+                        movie.movieLabel.value.toLowerCase().includes(searchText)
+                    );
+                    displayMovies(filteredMovies);
+                });
+            });
+
+            yearFilter.addEventListener('change', function () {
+                const selectedYearRange = yearFilter.value;
+                fetchMovies(buildQuery(selectedYearRange)).then(displayMovies);
+            });
+
+            // Play button logic
+            const playButton = document.getElementById("playButton");
+            let currentMovieIndex = 0;
+
+            playButton.addEventListener("click", function () {
+                const movies = document.querySelectorAll(".movie");
+                if (currentMovieIndex < movies.length) {
+                    const movie = movies[currentMovieIndex];
+                    movie.style.transform = "translateX(0)";
+                    movie.style.opacity = 1;
+
+                    setTimeout(() => {
+                        currentMovieIndex++;
+                        if (currentMovieIndex < movies.length) {
+                            playButton.innerText = "Play Next Movie";
+                        }
+                    }, 2000);
+                } else {
+                    playButton.innerText = "Timeline Complete";
+                    playButton.disabled = true;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

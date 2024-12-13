@@ -1,13 +1,12 @@
 document.addEventListener("DOMContentLoaded", function () {
     // URL of the Wikidata SPARQL endpoint
     const sparqlEndpoint = "https://query.wikidata.org/sparql";
-    
+
     // SPARQL query to fetch historical events
     const query = `
-    SELECT ?event ?eventLabel ?date ?image WHERE {
+    SELECT ?event ?eventLabel ?date WHERE {
         ?event wdt:P31 wd:Q1190556;  # Instance of event
               wdt:P585 ?date.     # The date of the event
-        OPTIONAL { ?event wdt:P18 ?image. }  # Image of the event
         SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
     }
     ORDER BY ?date
@@ -33,41 +32,55 @@ document.addEventListener("DOMContentLoaded", function () {
         const events = data.results.bindings;
         const timeline = document.getElementById("timeline");
 
-        // Iterate through the events and render them on the timeline
-        events.forEach(event => {
+        // Create and store event elements dynamically
+        const eventElements = [];
+        events.forEach((event, index) => {
             const eventDiv = document.createElement("div");
             eventDiv.classList.add("event");
 
-            // Event dot
-            const dot = document.createElement("div");
-            dot.classList.add("dot");
+            // Event position on the timeline
+            const eventDate = new Date(event.date.value);
+            const position = (eventDate.getFullYear() - 1900) * 20;  // Scale years to position
 
-            // Event details
+            eventDiv.style.left = `${position}px`;
+
+            // Add event label and date
             const label = document.createElement("div");
             label.classList.add("label");
             label.innerText = event.eventLabel.value;
 
             const date = document.createElement("div");
             date.classList.add("date");
-            date.innerText = new Date(event.date.value).toLocaleDateString();
+            date.innerText = eventDate.toLocaleDateString();
 
-            // Event image (optional)
-            const image = event.image ? document.createElement("img") : null;
-            if (image) {
-                image.src = event.image.value;
-                image.alt = event.eventLabel.value;
-            }
-
-            // Append the elements to the event div
-            eventDiv.appendChild(dot);
+            // Append elements
             eventDiv.appendChild(label);
             eventDiv.appendChild(date);
-            if (image) {
-                eventDiv.appendChild(image);
-            }
-
-            // Append the event div to the timeline
             timeline.appendChild(eventDiv);
+
+            eventElements.push(eventDiv);
+        });
+
+        // Play button logic
+        const playButton = document.getElementById("playButton");
+        let currentEventIndex = 0;
+
+        // Play animation for each event
+        playButton.addEventListener("click", function () {
+            if (currentEventIndex < eventElements.length) {
+                const event = eventElements[currentEventIndex];
+                event.style.transform = "translateX(600px)"; // Move the event across the timeline
+
+                // After 3 seconds (the duration of the animation), move to the next event
+                setTimeout(() => {
+                    currentEventIndex++;
+                    if (currentEventIndex < eventElements.length) {
+                        playButton.innerText = "Play Next Event";
+                    }
+                }, 3000); // 3 seconds to animate each event
+            } else {
+                playButton.innerText = "Timeline Complete";
+            }
         });
     })
     .catch(error => {
