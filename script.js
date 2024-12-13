@@ -86,9 +86,37 @@ SELECT ?movie ?movieLabel ?releaseDate ?wikipedia WHERE {
                schema:isPartOf <https://en.wikipedia.org/>. # Wikipedia link
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-}`;
+}
+
+`;
 
 const endpointUrl = "https://query.wikidata.org/sparql";
+
+const wikipediaApiUrl = "https://en.wikipedia.org/w/api.php"; 
+
+// Function to fetch image for a given Wikipedia title
+const fetchImage = async (wikipediaUrl) => {
+    if (!wikipediaUrl) return null;
+  
+    // Extract Wikipedia title from the URL
+    const title = wikipediaUrl.split("/").pop();
+    const url = `${wikipediaApiUrl}?action=query&format=json&prop=pageimages|images&titles=kerala&formatversion=2&piprop=thumbnail|name|original&pithumbsize=300&origin=*`;
+  
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      const pages = data.query.pages;
+      console.log(pages)
+      const pageId = Object.keys(pages)[0];
+      console.log(pageId)
+      return pages[pageId]?.thumbnail?.source || null;
+    } catch (error) {
+      // console.error(`Error fetching image for ${title}:`, error);
+      return null;
+    }
+  };
+
+
 
 fetch(endpointUrl, {
     method: "POST",
@@ -99,19 +127,32 @@ fetch(endpointUrl, {
     body: new URLSearchParams({ query }),
 })
     .then((response) => response.json())
-    .then((data) => {
+    .then(async (data) => {
         const bindings = data.results.bindings;
 
         if (bindings.length > 0) {
-            const sortedMovies = bindings
-                .map((movie) => ({
+            // Map data and sort by release date
+            const sortedMovies =await Promise.all(
+                bindings.map(async (movie) => {
+                  const wikipediaUrl = movie.wikipedia ? movie.wikipedia.value : null;
+                  const image = wikipediaUrl ? await fetchImage(wikipediaUrl) : null;
+        
+                  return {
                     title: movie.movieLabel.value,
                     releaseDate: movie.releaseDate
-                        ? new Date(movie.releaseDate.value)
-                        : null,
-                    wikipedia: movie.wikipedia ? movie.wikipedia.value : null,
-                }))
-                .sort((a, b) => (a.releaseDate - b.releaseDate || 0));
+                      ? new Date(movie.releaseDate.value)
+                      : null,
+                    wikipedia: wikipediaUrl,
+                    image,
+                  };
+                })
+              );
+
+              sortedMovies.sort((a, b) => {
+                if (!a.releaseDate) return 1; // Move unknown dates to the end
+                if (!b.releaseDate) return -1;
+                return a.releaseDate - b.releaseDate; // Ascending order
+              });
 
             const allYears = [...new Set(sortedMovies.map((movie) => movie.releaseDate?.getFullYear()))]
                 .filter(Boolean)
@@ -130,22 +171,30 @@ fetch(endpointUrl, {
                 .map((year) => `<span data-year="${year}">${year}</span>`)
                 .join('');
 
-            const movieList = sortedMovies.map((movie) => {
-                const releaseYear = movie.releaseDate
-                    ? new Date(movie.releaseDate).getFullYear()
-                    : "Unknown";
-                const wikipediaLink = movie.wikipedia
-                    ? `<a href="${movie.wikipedia}" target="_blank">Wikipedia</a>`
-                    : "No Link";
+           // Generate HTML for sorted movies as cards
+           const movieList = sortedMovies.map((movie) => {
+            const releaseYear = movie.releaseDate
+                ? new Date(movie.releaseDate).getFullYear()
+                : "Unknown";
+            const wikipediaLink = movie.wikipedia
+                ? `<a href="${movie.wikipedia}" target="_blank" class="text-blue-500 underline">Wikipedia</a>`
+                : "No Link";
 
-                return `
-                    <div class="movie-card" data-year="${releaseYear}">
-                        <h3>${movie.title}</h3>
-                        <p><strong>Release Year:</strong> ${releaseYear}</p>
-                        <p>${wikipediaLink}</p>
+            const imageTag = movie.image
+                ? `<img src="${movie.image}" alt="${movie.title}" width="200" height="200" >`
+                : `<img src="https://via.placeholder.com/200" alt="Placeholder">`;
+
+            return `
+                <div class="movie-card" data-year="${releaseYear}">
+                    <h3>${movie.title}</h3>
+                    <div class="movie-image">
+                    ${imageTag}
                     </div>
-                `;
-            });
+                    <p><strong>Release Date:</strong> ${releaseYear}</p>
+                    <p><strong>More Info:</strong> ${wikipediaLink}</p>
+                </div>
+            `;
+        });
 
             document.getElementById("movie-details").innerHTML = movieList.join("");
             movieCards = document.querySelectorAll('.movie-card');
