@@ -2,8 +2,9 @@ let progress = document.querySelector('.progress');
 let movieCards = document.querySelectorAll('.movie-card');
 let playInterval;
 let isPaused = false;
-let yearMarkers = []; // Dynamically populated based on fetched data.
+let yearMarkers = []; // Will hold dynamically populated year markers.
 
+// Start or continue playing the timeline
 function playTimeline() {
     let width = parseFloat(progress.style.width) || 0;
     clearInterval(playInterval);
@@ -14,29 +15,30 @@ function playTimeline() {
         if (width >= 100) {
             clearInterval(playInterval);
         } else {
-            width += 0.25; // Slower progress
+            width += 1; // Slower progress increment
             progress.style.width = `${width}%`;
 
-            // Calculate the current year based on progress
+            // Calculate and scroll to the corresponding year
             let currentYear = calculateYearFromProgress(width);
-
-            // Automatically scroll to the movie card of the current year
             scrollToYear(currentYear);
         }
-    }, 500); // Slower increment
+    }, 1000); // Slower timeline speed
 }
 
-function pauseTimeline() {
+// Toggle play/pause state
+function togglePause() {
     isPaused = !isPaused;
-    document.getElementById('play-pause-btn').innerText = isPaused ? 'Play' : 'Pause';
+    document.getElementById('playButton').innerText = isPaused ? 'Play' : 'Pause';
 }
 
+// Calculate year based on progress width
 function calculateYearFromProgress(progressWidth) {
     const totalYears = yearMarkers[yearMarkers.length - 1] - yearMarkers[0];
     const relativeYear = Math.round((progressWidth / 100) * totalYears);
     return yearMarkers[0] + relativeYear;
 }
 
+// Filter displayed movies based on user input
 function filterTimeline() {
     let filterValue = document.getElementById('filterYear').value.trim();
     movieCards.forEach((card) => {
@@ -49,6 +51,7 @@ function filterTimeline() {
     });
 }
 
+// Scroll to a specific year on the timeline
 function scrollToYear(year) {
     const movieCard = [...movieCards].find((card) => card.getAttribute('data-year') === year.toString());
     if (movieCard) {
@@ -67,25 +70,17 @@ function attachTimelineClickEvent() {
         const progressWidth = (clickPosition / timelineWidth) * 100;
         const clickedYear = calculateYearFromProgress(progressWidth);
 
+        progress.style.width = `${progressWidth}%`;
         scrollToYear(clickedYear);
     });
 }
 
-// Make timeline and play button static
-window.addEventListener('scroll', () => {
-    const controls = document.querySelector('.timeline-controls');
-    controls.style.position = 'fixed';
-    controls.style.bottom = '10px';
-    controls.style.left = '10px';
-    controls.style.zIndex = '1000';
-});
-
-// Fetch movie data from Wikidata
+// Fetch and display movies dynamically
 const query = `
-SELECT ?movie ?movieLabel ?releaseDate ?directorLabel ?castLabel ?wikipedia WHERE {
-  ?movie wdt:P31 wd:Q11424.                  # Movie instance
+SELECT ?movie ?movieLabel ?releaseDate ?wikipedia WHERE {
+  ?movie wdt:P31 wd:Q11424.                  # Instance of movie
   ?movie wdt:P364 wd:Q36236.                 # Language is Malayalam
-  OPTIONAL { ?movie wdt:P577 ?releaseDate. } # Release date (optional)
+  OPTIONAL { ?movie wdt:P577 ?releaseDate. } # Release date
   OPTIONAL {
     ?wikipedia schema:about ?movie;
                schema:isPartOf <https://en.wikipedia.org/>. # Wikipedia link
@@ -108,7 +103,6 @@ fetch(endpointUrl, {
         const bindings = data.results.bindings;
 
         if (bindings.length > 0) {
-            // Map and sort movies by release date
             const sortedMovies = bindings
                 .map((movie) => ({
                     title: movie.movieLabel.value,
@@ -117,18 +111,13 @@ fetch(endpointUrl, {
                         : null,
                     wikipedia: movie.wikipedia ? movie.wikipedia.value : null,
                 }))
-                .sort((a, b) => {
-                    if (!a.releaseDate) return 1; // Unknown dates to the end
-                    if (!b.releaseDate) return -1;
-                    return a.releaseDate - b.releaseDate; // Ascending order
-                });
+                .sort((a, b) => (a.releaseDate - b.releaseDate || 0));
 
-            // Generate year markers dynamically at intervals (e.g., every 25 years)
             const allYears = [...new Set(sortedMovies.map((movie) => movie.releaseDate?.getFullYear()))]
                 .filter(Boolean)
                 .sort((a, b) => a - b);
 
-            const interval = 25; // Year interval (e.g., 1925, 1950, 1975...)
+            const interval = 25;
             const startYear = Math.floor(allYears[0] / interval) * interval;
             const endYear = Math.ceil(allYears[allYears.length - 1] / interval) * interval;
 
@@ -138,37 +127,40 @@ fetch(endpointUrl, {
             }
 
             document.querySelector('.year-markers').innerHTML = yearMarkers
-            .map((year) => `<span data-year="${year}" style="visibility: visible; margin: 0 10px; font-size: 14px;">${year}</span>`)
-            .join('');
+                .map((year) => `<span data-year="${year}">${year}</span>`)
+                .join('');
 
-            // Generate movie cards
             const movieList = sortedMovies.map((movie) => {
                 const releaseYear = movie.releaseDate
                     ? new Date(movie.releaseDate).getFullYear()
                     : "Unknown";
                 const wikipediaLink = movie.wikipedia
-                    ? `<a href="${movie.wikipedia}" target="_blank" class="text-blue-500 underline">Wikipedia</a>`
+                    ? `<a href="${movie.wikipedia}" target="_blank">Wikipedia</a>`
                     : "No Link";
 
                 return `
                     <div class="movie-card" data-year="${releaseYear}">
                         <h3>${movie.title}</h3>
-                        <p><strong>Release Date:</strong> ${releaseYear}</p>
-                        <p><strong>More Info:</strong> ${wikipediaLink}</p>
+                        <p><strong>Release Year:</strong> ${releaseYear}</p>
+                        <p>${wikipediaLink}</p>
                     </div>
                 `;
             });
 
             document.getElementById("movie-details").innerHTML = movieList.join("");
             movieCards = document.querySelectorAll('.movie-card');
-
-            // Attach events to timeline
             attachTimelineClickEvent();
         } else {
-            document.getElementById("movie-details").innerHTML = "<p>No Malayalam movies found.</p>";
+            document.getElementById("movie-details").innerHTML = "<p>No movies found.</p>";
         }
     })
     .catch((error) => {
-        console.error("Error fetching data:", error);
-        document.getElementById("movie-details").innerHTML = "<p>Error loading data.</p>";
+        console.error("Error fetching movie data:", error);
+        document.getElementById("movie-details").innerHTML = "<p>Error loading movies.</p>";
     });
+
+// Event listeners
+document.getElementById('playButton').addEventListener('click', () => {
+    if (!isPaused) playTimeline();
+    togglePause();
+});
