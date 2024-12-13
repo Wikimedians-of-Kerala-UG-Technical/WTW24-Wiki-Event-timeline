@@ -10,7 +10,7 @@ SELECT ?movie ?movieLabel ?releaseDate ?directorLabel ?castLabel ?wikipedia WHER
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
 }
-`;
+`; 
 
 // Wikidata endpoint URL
 const endpointUrl = "https://query.wikidata.org/sparql";
