@@ -3,6 +3,7 @@ let movieCards = document.querySelectorAll('.movie-card');
 let playInterval;
 let isPaused = false;
 let yearMarkers = []; // Will hold dynamically populated year markers.
+let yearColors = {};  // Object to hold color for each year
 
 // Start or continue playing the timeline
 function playTimeline() {
@@ -51,11 +52,27 @@ function filterTimeline() {
     });
 }
 
-// Scroll to a specific year on the timeline
+// Scroll to a specific year on the timeline and highlight the movie cards
 function scrollToYear(year) {
-    const movieCard = [...movieCards].find((card) => card.getAttribute('data-year') === year.toString());
-    if (movieCard) {
-        movieCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Reset previous highlights
+    movieCards.forEach((card) => {
+        card.classList.remove('highlight'); // Remove any previous highlights
+        card.style.backgroundColor = '';    // Reset the background color
+    });
+
+    // Find the movie cards for the clicked year
+    const yearCards = [...movieCards].filter((card) => card.getAttribute('data-year') === year.toString());
+
+    // Highlight the movie cards of the clicked year
+    yearCards.forEach((card) => {
+        const color = yearColors[year] || 'yellow';  // Default to yellow if no color is assigned
+        card.classList.add('highlight');
+        card.style.backgroundColor = color; // Set the background color for the year
+    });
+
+    // Scroll the first movie card of the selected year into view
+    if (yearCards.length > 0) {
+        yearCards[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
 
@@ -86,37 +103,9 @@ SELECT ?movie ?movieLabel ?releaseDate ?wikipedia WHERE {
                schema:isPartOf <https://en.wikipedia.org/>. # Wikipedia link
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-}
-
-`;
+}`;
 
 const endpointUrl = "https://query.wikidata.org/sparql";
-
-const wikipediaApiUrl = "https://en.wikipedia.org/w/api.php"; 
-
-// Function to fetch image for a given Wikipedia title
-const fetchImage = async (wikipediaUrl) => {
-    if (!wikipediaUrl) return null;
-  
-    // Extract Wikipedia title from the URL
-    const title = wikipediaUrl.split("/").pop();
-    const url = `${wikipediaApiUrl}?action=query&format=json&prop=pageimages|images&titles=kerala&formatversion=2&piprop=thumbnail|name|original&pithumbsize=300&origin=*`;
-  
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-      const pages = data.query.pages;
-      console.log(pages)
-      const pageId = Object.keys(pages)[0];
-      console.log(pageId)
-      return pages[pageId]?.thumbnail?.source || null;
-    } catch (error) {
-      // console.error(`Error fetching image for ${title}:`, error);
-      return null;
-    }
-  };
-
-
 
 fetch(endpointUrl, {
     method: "POST",
@@ -127,32 +116,19 @@ fetch(endpointUrl, {
     body: new URLSearchParams({ query }),
 })
     .then((response) => response.json())
-    .then(async (data) => {
+    .then((data) => {
         const bindings = data.results.bindings;
 
         if (bindings.length > 0) {
-            // Map data and sort by release date
-            const sortedMovies =await Promise.all(
-                bindings.map(async (movie) => {
-                  const wikipediaUrl = movie.wikipedia ? movie.wikipedia.value : null;
-                  const image = wikipediaUrl ? await fetchImage(wikipediaUrl) : null;
-        
-                  return {
+            const sortedMovies = bindings
+                .map((movie) => ({
                     title: movie.movieLabel.value,
                     releaseDate: movie.releaseDate
-                      ? new Date(movie.releaseDate.value)
-                      : null,
-                    wikipedia: wikipediaUrl,
-                    image,
-                  };
-                })
-              );
-
-              sortedMovies.sort((a, b) => {
-                if (!a.releaseDate) return 1; // Move unknown dates to the end
-                if (!b.releaseDate) return -1;
-                return a.releaseDate - b.releaseDate; // Ascending order
-              });
+                        ? new Date(movie.releaseDate.value)
+                        : null,
+                    wikipedia: movie.wikipedia ? movie.wikipedia.value : null,
+                }))
+                .sort((a, b) => (a.releaseDate - b.releaseDate || 0));
 
             const allYears = [...new Set(sortedMovies.map((movie) => movie.releaseDate?.getFullYear()))]
                 .filter(Boolean)
@@ -167,34 +143,32 @@ fetch(endpointUrl, {
                 yearMarkers.push(year);
             }
 
+            // Assign colors for each year
+            yearMarkers.forEach((year, index) => {
+                const colors = ['#FF6347', '#FFD700', '#ADFF2F', '#20B2AA', '#8A2BE2', '#FF1493', '#00BFFF']; // Example colors
+                yearColors[year] = colors[index % colors.length];  // Loop through colors
+            });
+
             document.querySelector('.year-markers').innerHTML = yearMarkers
                 .map((year) => `<span data-year="${year}">${year}</span>`)
                 .join('');
 
-           // Generate HTML for sorted movies as cards
-           const movieList = sortedMovies.map((movie) => {
-            const releaseYear = movie.releaseDate
-                ? new Date(movie.releaseDate).getFullYear()
-                : "Unknown";
-            const wikipediaLink = movie.wikipedia
-                ? `<a href="${movie.wikipedia}" target="_blank" class="text-blue-500 underline">Wikipedia</a>`
-                : "No Link";
+            const movieList = sortedMovies.map((movie) => {
+                const releaseYear = movie.releaseDate
+                    ? new Date(movie.releaseDate).getFullYear()
+                    : "Unknown";
+                const wikipediaLink = movie.wikipedia
+                    ? `<a href="${movie.wikipedia}" target="_blank">Wikipedia</a>`
+                    : "No Link";
 
-            const imageTag = movie.image
-                ? `<img src="${movie.image}" alt="${movie.title}" width="200" height="200" >`
-                : `<img src="https://via.placeholder.com/200" alt="Placeholder">`;
-
-            return `
-                <div class="movie-card" data-year="${releaseYear}">
-                    <h3>${movie.title}</h3>
-                    <div class="movie-image">
-                    ${imageTag}
+                return `
+                    <div class="movie-card" data-year="${releaseYear}">
+                        <h3>${movie.title}</h3>
+                        <p><strong>Release Year:</strong> ${releaseYear}</p>
+                        <p>${wikipediaLink}</p>
                     </div>
-                    <p><strong>Release Date:</strong> ${releaseYear}</p>
-                    <p><strong>More Info:</strong> ${wikipediaLink}</p>
-                </div>
-            `;
-        });
+                `;
+            });
 
             document.getElementById("movie-details").innerHTML = movieList.join("");
             movieCards = document.querySelectorAll('.movie-card');
@@ -213,3 +187,13 @@ document.getElementById('playButton').addEventListener('click', () => {
     if (!isPaused) playTimeline();
     togglePause();
 });
+
+// Add a new CSS rule for the highlight effect
+const style = document.createElement('style');
+style.innerHTML = `
+    .movie-card.highlight {
+        border: 2px solid red;     /* Add border if needed */
+        color: white;              /* Change text color if needed */
+    }
+`;
+document.head.appendChild(style);
